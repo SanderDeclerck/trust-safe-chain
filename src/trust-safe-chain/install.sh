@@ -34,12 +34,19 @@ END {
 
 echo "${BLUE}Found root certificate: ${LAST_CERT}${RESET}"
 
-# 4. Check the issuer
+# 4. Check the issuer - extract and validate specific DN fields for security
 ISSUER=$(openssl x509 -in "$LAST_CERT" -noout -issuer)
 echo "${BLUE}Root certificate issuer: ${ISSUER}${RESET}"
 
-# Check if the issuer contains both key identifiers (more robust than exact match)
-if ! echo "$ISSUER" | grep -q "Aikido safe-chain proxy" || ! echo "$ISSUER" | grep -q "aikidosafechain.com"; then
+# Extract Organization (O) and Common Name (CN) fields from the issuer
+ISSUER_O=$(openssl x509 -in "$LAST_CERT" -noout -issuer -nameopt sep_multiline | grep "^    O=" | sed 's/^    O=//')
+ISSUER_CN=$(openssl x509 -in "$LAST_CERT" -noout -issuer -nameopt sep_multiline | grep "^    CN=" | sed 's/^    CN=//')
+
+echo "${BLUE}Issuer Organization: ${ISSUER_O}${RESET}"
+echo "${BLUE}Issuer Common Name: ${ISSUER_CN}${RESET}"
+
+# Verify both fields match expected values exactly
+if [ "$ISSUER_O" != "Aikido safe-chain proxy" ] || [ "$ISSUER_CN" != "aikidosafechain.com" ]; then
     echo "${YELLOW}The certificate of npmjs is not signed by aikido safe-chain, nothing to do here${RESET}"
     rm -rf $TEMP_DIR
     exit 0
