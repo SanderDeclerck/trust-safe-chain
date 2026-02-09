@@ -38,7 +38,8 @@ echo "${BLUE}Found root certificate: ${LAST_CERT}${RESET}"
 ISSUER=$(openssl x509 -in "$LAST_CERT" -noout -issuer)
 echo "${BLUE}Root certificate issuer: ${ISSUER}${RESET}"
 
-if [ "$ISSUER" != "issuer=O = Aikido safe-chain proxy, CN = aikidosafechain.com" ]; then
+# Check if the issuer contains both key identifiers (more robust than exact match)
+if ! echo "$ISSUER" | grep -q "Aikido safe-chain proxy" || ! echo "$ISSUER" | grep -q "aikidosafechain.com"; then
     echo "${YELLOW}The certificate of npmjs is not signed by aikido safe-chain, nothing to do here${RESET}"
     rm -rf $TEMP_DIR
     exit 0
