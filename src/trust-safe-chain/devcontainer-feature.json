@@ -1,0 +1,11 @@
+{
+    "name": "Aikido Trust Safe-Chain",
+    "id": "trust-safe-chain",
+    "version": "1.0.0",
+    "description": "Automatically installs Aikido safe-chain proxy SSL certificates to the system trust store when detected",
+    "documentationURL": "https://github.com/sanderdeclerck/trust-safe-chain",
+    "licenseURL": "https://github.com/sanderdeclerck/trust-safe-chain/blob/main/LICENSE",
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}

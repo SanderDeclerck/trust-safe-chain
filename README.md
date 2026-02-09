@@ -1,188 +1,113 @@
-# Dev Container Features: Self Authoring Template
+# Aikido Trust Safe-Chain DevContainer Feature
 
-> This repo provides a starting point and example for creating your own custom [dev container Features](https://containers.dev/implementors/features/), hosted for free on GitHub Container Registry.  The example in this repository follows the [dev container Feature distribution specification](https://containers.dev/implementors/features-distribution/).  
->
-> To provide feedback to the specification, please leave a comment [on spec issue #70](https://github.com/devcontainers/spec/issues/70). For more broad feedback regarding dev container Features, please see [spec issue #61](https://github.com/devcontainers/spec/issues/61).
+A DevContainer feature that automatically detects and installs Aikido safe-chain proxy SSL certificates to the system trust store.
 
-## Example Contents
+## What is Aikido Safe-Chain?
 
-This repository contains a _collection_ of two Features - `hello` and `color`. These Features serve as simple feature implementations.  Each sub-section below shows a sample `devcontainer.json` alongside example usage of the Feature.
+[Aikido safe-chain](https://www.aikido.dev/safe-chain) is a security proxy that sits between your application and package registries like npmjs.org, scanning packages for malware and vulnerabilities before they reach your system.
 
-### `hello`
+## What This Feature Does
 
-Running `hello` inside the built container will print the greeting provided to it via its `greeting` option.
+This feature:
+1. Checks if your npm registry connection is proxied through Aikido safe-chain
+2. If detected, automatically extracts and installs the Aikido root certificate to your system trust store
+3. If not detected, exits gracefully without making changes
 
-```jsonc
-{
-    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-    "features": {
-        "ghcr.io/devcontainers/feature-starter/hello:1": {
-            "greeting": "Hello"
-        }
-    }
-}
-```
+This ensures that HTTPS connections to package registries work seamlessly when using Aikido's security proxy.
 
-```bash
-$ hello
+## Usage
 
-Hello, user.
-```
-
-### `color`
-
-Running `color` inside the built container will print your favorite color to standard out.
+Add this feature to your `devcontainer.json`:
 
 ```jsonc
 {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "features": {
-        "ghcr.io/devcontainers/feature-starter/color:1": {
-            "favorite": "green"
-        }
+        "ghcr.io/sanderdeclerck/trust-safe-chain/trust-safe-chain:1": {}
     }
 }
 ```
 
-```bash
-$ color
+## Features
 
-my favorite color is green
-```
+- **Zero configuration**: Automatically detects if Aikido safe-chain is in use
+- **Safe**: Only installs certificates when properly validated
+- **Graceful**: Exits without error if Aikido safe-chain is not detected
+- **Debian/Ubuntu compatible**: Works on Debian and Ubuntu-based images
 
-## Repo and Feature Structure
+## Requirements
 
-Similar to the [`devcontainers/features`](https://github.com/devcontainers/features) repo, this repository has a `src` folder.  Each Feature has its own sub-folder, containing at least a `devcontainer-feature.json` and an entrypoint script `install.sh`. 
+- Debian or Ubuntu-based container image
+- `openssl` (usually pre-installed)
+- `update-ca-certificates` (usually pre-installed)
 
-```
-├── src
-│   ├── hello
-│   │   ├── devcontainer-feature.json
-│   │   └── install.sh
-│   ├── color
-│   │   ├── devcontainer-feature.json
-│   │   └── install.sh
-|   ├── ...
-│   │   ├── devcontainer-feature.json
-│   │   └── install.sh
-...
-```
-
-An [implementing tool](https://containers.dev/supporting#tools) will composite [the documented dev container properties](https://containers.dev/implementors/features/#devcontainer-feature-json-properties) from the feature's `devcontainer-feature.json` file, and execute in the `install.sh` entrypoint script in the container during build time.  Implementing tools are also free to process attributes under the `customizations` property as desired.
-
-### Options
-
-All available options for a Feature should be declared in the `devcontainer-feature.json`.  The syntax for the `options` property can be found in the [devcontainer Feature json properties reference](https://containers.dev/implementors/features/#devcontainer-feature-json-properties).
-
-For example, the `color` feature provides an enum of three possible options (`red`, `gold`, `green`).  If no option is provided in a user's `devcontainer.json`, the value is set to "red".
+For best results, use with the common-utils feature:
 
 ```jsonc
 {
-    // ...
-    "options": {
-        "favorite": {
-            "type": "string",
-            "enum": [
-                "red",
-                "gold",
-                "green"
-            ],
-            "default": "red",
-            "description": "Choose your favorite color."
-        }
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:1": {},
+        "ghcr.io/sanderdeclerck/trust-safe-chain/trust-safe-chain:1": {}
     }
 }
 ```
 
-Options are exported as Feature-scoped environment variables.  The option name is captialized and sanitized according to [option resolution](https://containers.dev/implementors/features/#option-resolution).
+## How It Works
 
-```bash
-#!/bin/bash
+1. Connects to `registry.npmjs.org` and retrieves the SSL certificate chain
+2. Extracts the root certificate
+3. Validates that the issuer is "Aikido safe-chain proxy"
+4. If validated, copies the certificate to `/usr/local/share/ca-certificates/`
+5. Runs `update-ca-certificates` to update the system trust store
 
-echo "Activating feature 'color'"
-echo "The provided favorite color is: ${FAVORITE}"
+## Development
 
-...
+### Repository Structure
+
+```
+├── src/
+│   └── trust-safe-chain/
+│       ├── devcontainer-feature.json
+│       └── install.sh
+├── test/
+│   └── trust-safe-chain/
+│       ├── scenarios.json
+│       ├── test.sh
+│       └── with_common_utils.sh
+└── README.md
 ```
 
-## Distributing Features
+### Testing
 
-### Versioning
+Tests are run automatically via GitHub Actions on every push and pull request.
 
-Features are individually versioned by the `version` attribute in a Feature's `devcontainer-feature.json`.  Features are versioned according to the semver specification. More details can be found in [the dev container Feature specification](https://containers.dev/implementors/features/#versioning).
+To test locally:
+
+```bash
+# Install devcontainer CLI
+npm install -g @devcontainers/cli
+
+# Run all tests
+devcontainer features test -f trust-safe-chain .
+
+# Run specific scenario
+devcontainer features test -f trust-safe-chain --skip-autogenerated .
+```
 
 ### Publishing
 
-> NOTE: The Distribution spec can be [found here](https://containers.dev/implementors/features-distribution/).  
->
-> While any registry [implementing the OCI Distribution spec](https://github.com/opencontainers/distribution-spec) can be used, this template will leverage GHCR (GitHub Container Registry) as the backing registry.
+Features are published to GitHub Container Registry (GHCR) via the release workflow.
 
-Features are meant to be easily sharable units of dev container configuration and installation code.  
+To publish:
+1. Update the version in `src/trust-safe-chain/devcontainer-feature.json`
+2. Run the "Release dev container features & Generate Documentation" workflow
+3. The feature will be published to GHCR with the specified version
 
-This repo contains a **GitHub Action** [workflow](.github/workflows/release.yaml) that will publish each Feature to GHCR. 
+## License
 
-*Allow GitHub Actions to create and approve pull requests* should be enabled in the repository's `Settings > Actions > General > Workflow permissions` for auto generation of `src/<feature>/README.md` per Feature (which merges any existing `src/<feature>/NOTES.md`).
+See [LICENSE](LICENSE) file.
 
-By default, each Feature will be prefixed with the `<owner/<repo>` namespace.  For example, the two Features in this repository can be referenced in a `devcontainer.json` with:
+## Contributing
 
-```
-ghcr.io/devcontainers/feature-starter/color:1
-ghcr.io/devcontainers/feature-starter/hello:1
-```
-
-The provided GitHub Action will also publish a third "metadata" package with just the namespace, eg: `ghcr.io/devcontainers/feature-starter`.  This contains information useful for tools aiding in Feature discovery.
-
-'`devcontainers/feature-starter`' is known as the feature collection namespace.
-
-### Marking Feature Public
-
-Note that by default, GHCR packages are marked as `private`.  To stay within the free tier, Features need to be marked as `public`.
-
-This can be done by navigating to the Feature's "package settings" page in GHCR, and setting the visibility to 'public`.  The URL may look something like:
-
-```
-https://github.com/users/<owner>/packages/container/<repo>%2F<featureName>/settings
-```
-
-<img width="669" alt="image" src="https://user-images.githubusercontent.com/23246594/185244705-232cf86a-bd05-43cb-9c25-07b45b3f4b04.png">
-
-### Adding Features to the Index
-
-If you'd like your Features to appear in our [public index](https://containers.dev/features) so that other community members can find them, you can do the following:
-
-* Go to [github.com/devcontainers/devcontainers.github.io](https://github.com/devcontainers/devcontainers.github.io)
-     * This is the GitHub repo backing the [containers.dev](https://containers.dev/) spec site
-* Open a PR to modify the [collection-index.yml](https://github.com/devcontainers/devcontainers.github.io/blob/gh-pages/_data/collection-index.yml) file
-
-This index is from where [supporting tools](https://containers.dev/supporting) like [VS Code Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) and [GitHub Codespaces](https://github.com/features/codespaces) surface Features for their dev container creation UI.
-
-#### Using private Features in Codespaces
-
-For any Features hosted in GHCR that are kept private, the `GITHUB_TOKEN` access token in your environment will need to have `package:read` and `contents:read` for the associated repository.
-
-Many implementing tools use a broadly scoped access token and will work automatically.  GitHub Codespaces uses repo-scoped tokens, and therefore you'll need to add the permissions in `devcontainer.json`
-
-An example `devcontainer.json` can be found below.
-
-```jsonc
-{
-    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-    "features": {
-     "ghcr.io/my-org/private-features/hello:1": {
-            "greeting": "Hello"
-        }
-    },
-    "customizations": {
-        "codespaces": {
-            "repositories": {
-                "my-org/private-features": {
-                    "permissions": {
-                        "packages": "read",
-                        "contents": "read"
-                    }
-                }
-            }
-        }
-    }
-}
-```
+Contributions are welcome! Please feel free to submit a Pull Request.
